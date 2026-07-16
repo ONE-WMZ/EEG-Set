@@ -190,7 +190,8 @@ def on_leave(data):
     print(f'Client left room: device_{device_id}')
     return {'message': f'Left room: device_{device_id}'}
 
-# ------------------------------- 页面路由 -------------------------------
+# ----------------------------------------------------------------------
+#  页面路由 
 @app.route('/user')
 def user():
     """用户主页"""
