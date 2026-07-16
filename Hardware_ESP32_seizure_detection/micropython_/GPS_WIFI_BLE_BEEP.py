@@ -8,7 +8,7 @@
                     5. 增强调试信息与容错处理
 """
 
-# ============================ 导入依赖 ============================
+#  导入依赖 
 import sys  # 用于打印异常
 import machine
 import time
@@ -22,7 +22,7 @@ import ustruct
 from machine import UART, Pin
 import neopixel
 
-# ============================ RGB 灯配置 ============================
+#  RGB 灯配置 
 RGB_PIN = 48  # ESP32-S3 板载 RGB 控制引脚
 RGB_NUM = 1   # RGB灯数量
 
@@ -36,23 +36,23 @@ def rgb_flash(color=(0, 0, 255), times=2, delay_ms=200):
         np.write()
         time.sleep_ms(delay_ms)
         
-# ============================ 蜂鸣器控制 ============================
-BUZZER_PIN = 10  # 蜂鸣器连接的GPIO引脚
-buzzer = Pin(BUZZER_PIN, Pin.OUT, value=1)  # 初始化蜂鸣器（高电平关闭）
+#  蜂鸣器控制 
+BUZZER_PIN = 10                                                  # 蜂鸣器连接的GPIO引脚
+buzzer = Pin(BUZZER_PIN, Pin.OUT, value=1)                       # 初始化蜂鸣器（高电平关闭）
 
 def alarm_beep(times=3, on_ms=200, off_ms=200):
     """报警模式，间歇鸣响"""
     for _ in range(times):
-        buzzer.value(0)  # 低电平触发
+        buzzer.value(0)                                          # 低电平触发
         time.sleep_ms(on_ms)
-        buzzer.value(1)  # 高电平关闭
+        buzzer.value(1)                                          # 高电平关闭
         time.sleep_ms(off_ms)
 
-# ============================ 全局变量 ============================
-device_id = "3"  # 设备编号
-nmea_x = 0.0     # GPS经度
-nmea_y = 0.0     # GPS纬度
-gps_data_valid = False  # GPS数据有效标志
+#  全局变量 
+device_id = "3"                          # 设备编号
+nmea_x = 0.0                             # GPS经度
+nmea_y = 0.0                             # GPS纬度
+gps_data_valid = False                   # GPS数据有效标志
 last_x = 0.0
 last_y = 0.0
 
@@ -63,22 +63,16 @@ GPS_UART_TX_PIN = 17
 GPS_UART_BUFFER_SIZE = 1024
 
 # WiFi配置
-# WIFI_SSID = "Redmi"   # "mw-OpenWrt"    
-# WIFI_PASS = "wwwwwwww"   # "1176224694"
-WIFI_SSID = "mw-OpenWrt"    
-WIFI_PASS = "1176224694"
+# WIFI_SSID = "ONE."
+# WIFI_PASS = "1234456789"   
+
 
 # 服务器配置
-URL_web = "http://10.120.87.109:5000/api/device/data"      # 服务器地址：电脑端     
-# URL_web = "http://8.154.30.107/api/device/data"              # 服务器地址：阿里云
-
-
-# BLE数据缓冲
+URL_web = "http://aliyun:5000/api/device/data"         # 服务器地址   
 
 # 采样率200HZ
-ble_data_received = False  # BLE数据接收完成标志
+ble_data_received = False                                      # BLE数据接收完成标志
 
-# ============================ 数据池（蓝牙数据） ============================
 # 数据池：存放蓝牙接收到的数据（固定长度，循环队列）
 class data_pool():
     def __init__(self, size):
@@ -100,7 +94,8 @@ class data_pool():
 
 buffer_size = 200  # 定义缓冲区大小
 pool_data = data_pool(buffer_size)
-# ============================ BLE模块（蓝牙） ============================
+
+#  BLE模块（蓝牙） 
 class BLEService():
     def __init__(self):
         self.ble = bluetooth.BLE()
@@ -109,7 +104,7 @@ class BLEService():
             raise RuntimeError("无法激活BLE")
 
         self.ble.config(gap_name="Seizure-3")
-        self.ble.config(mtu=512)      ####  必须得手动调节 !!!!
+        self.ble.config(mtu=512)                                          ####  必须得手动调节 !!!!
         print("[change MTU]：",self.ble.config('mtu'))
         
         self.ble.irq(self._irq_callback)
@@ -118,7 +113,7 @@ class BLEService():
         self.chr_handle = None
         self.connected = False
 
-        self._setup_service()   # 注册服务
+        self._setup_service()                                                   # 注册服务
         
         self._start_advertising()
         
@@ -141,7 +136,7 @@ class BLEService():
     def _start_advertising(self):
         adv_data = bytearray()
         adv_data += b'\x02\x01\x06'
-        adv_data += b'\x03\x03' + struct.pack("<H", 0x180F)  # 示例服务UUID (16-bit format)
+        adv_data += b'\x03\x03' + struct.pack("<H", 0x180F) 
         adv_data += b'\x0A\x09' + "Seizure-3".encode('utf-8')
         self.ble.gap_advertise(100, adv_data)
 
@@ -171,10 +166,9 @@ class BLEService():
                 print(f"数据解析错误: {e}")
 
 
-# ============================ GPS模块 ============================
+#  GPS模块 
 class GPSReader:
     def __init__(self):
-        """初始化GPS UART接口"""
         self.uart = UART(
             GPS_UART_PORT, 
             baudrate=9600,
@@ -184,10 +178,9 @@ class GPSReader:
         print("[GPS UART Init Finished]")
         self.nmea_x = 0.0
         self.nmea_y = 0.0
-        self.last_gps_time = 0  # 新增时间记录变量
+        self.last_gps_time = 0  
 
     def read_gps_data(self):
-        """读取并解析GPS数据"""
         if time.time() - self.last_gps_time >= 2.0:   # 定位每两秒读一次，给出时间处理其他事件
             if self.uart.any():
                 try:
@@ -201,14 +194,11 @@ class GPSReader:
                     print(f"GPS数据解析错误: {e}")
 
     def _parse_gll(self, sentence):
-        """优化后的GLL语句解析方法"""
         try:
             parts = sentence.split(',')
             if len(parts) < 7:  # GLL语句至少需要7个字段
                 return False
-            
             global gps_data_valid, nmea_x, nmea_y, last_x, last_y
-            
             # 快速检查数据有效性
             if parts[6] != 'A':  # 状态不是'A'ctive
                 print(f"[Invalid GPS] Status: {parts[6]}")
@@ -218,35 +208,29 @@ class GPSReader:
                     gps_data_valid = True
                     print("[Using historical data]")
                 return False
-
             # 解析纬度
             lat = float(parts[1])
             if 'S' in parts[2]:
                 lat = -lat
-                
             # 解析经度
             lon = float(parts[3])
             if 'W' in parts[4]:
                 lon = -lon
-                
             # 更新当前数据
             self.nmea_x = lon
             self.nmea_y = lat
             nmea_x = self.nmea_x
             nmea_y = self.nmea_y
             print("[GPS Updata]")
-            
             # 更新历史数据
             last_x = nmea_x
             last_y = nmea_y
             gps_data_valid = True
              # if __debug__:
                 # print(f"[Valid GPS] Lat: {self.nmea_y:.6f}, Lon: {self.nmea_x:.6f}")
-            
             gps_data_valid = True
             self.last_gps_time = time.time()  # 记录最后有效GPS时间
             return True
-            
         except ValueError as ve:
             print(f"坐标转换错误: {ve}")
             return False
@@ -254,14 +238,12 @@ class GPSReader:
             print(f"解析GLL异常: {e}")
             return False
 
-# ============================ WiFi模块 ============================
+#  WiFi模块 
 class WiFiManager:
     def __init__(self):
-        """初始化WiFi接口"""
         self.sta_if = network.WLAN(network.STA_IF)
 
     def connect(self):
-        """连接WiFi网络"""
         if not self.sta_if.isconnected():
             print("[Connecting WiFi]...")
             self.sta_if.active(True)
@@ -278,24 +260,20 @@ class WiFiManager:
             print("[WiFi connect failed]")
             return False
 
-# ============================ 数据上传模块 ============================
+#  数据上传模块 
 def http_post(url, data):
-    """发送 HTTP POST 请求"""
     try:
         json_payload = json.dumps(data)
-
         print(f"[POSR URL]: {url}")
         print(f"[Request content]: {json_payload}")
-
         headers = {'Content-Type': 'application/json'}
         response = urequests.post(url, headers=headers, data=json_payload)
-
         # 解析响应为 JSON 字典
         try:
-            data = response.json()  # 关键步骤！转换成字典
-            if data.get("status") == "1":  # 安全地访问字段
+            data = response.json()                                                              # 转换成字典
+            if data.get("status") == "1":                                                  # 安全地访问字段
                 # rgb_flash(color=(255, 0, 0), times=2, delay_ms=200)
-                alarm_beep(times=3)  # 触发蜂鸣器报警3声
+                alarm_beep(times=3)                                                              # 触发蜂鸣器报警3声
         except ValueError:
             print("响应内容不是合法的JSON")
             
@@ -310,7 +288,6 @@ def http_post(url, data):
         return False
 
 def ensure_json_serializable(data):
-    """确保数据是JSON可序列化的"""
     if isinstance(data, list):
         return [ensure_json_serializable(item) for item in data]
     elif isinstance(data, dict):
@@ -318,11 +295,9 @@ def ensure_json_serializable(data):
     elif isinstance(data, (int, float, str, bool, type(None))):
         return data
     else:
-        # 如果不是基本类型，则尝试转换为字符串
         return str(data)
 
 
-# ==============================================================================
 # 上传数据到服务器
 class DataUploader:
     # 缓存上一次的时间字符串，避免重复生成
@@ -331,7 +306,6 @@ class DataUploader:
     
     @staticmethod
     def _get_current_time_str():
-        """优化时间字符串生成"""
         now = time.time()
         if now - DataUploader._last_time_sec < 2.0:  # 2秒内使用缓存
             return DataUploader._last_time_str
@@ -343,25 +317,21 @@ class DataUploader:
 
     @staticmethod
     def generate_payload():
-        """生成上传数据负载 - 优化版"""
         try:
             # 预检查数据有效性
             if pool_data.get_new() == None:
                 return None
-
             # 使用优化的时间获取方法
             time_str = DataUploader._get_current_time_str()
-
             # 构建最小化payload
             payload = {
-                'device_id': device_id,  # 假设device_id已经是字符串
+                'device_id': device_id,  
                 'position_x': "%.6f" % nmea_x,  # 限制小数位数
                 'position_y': "%.6f" % nmea_y,
                 'time_stamp': time_str,
                 'user_data': pool_data.get_new()  
             }
 
-            # 调试信息改为条件输出
             if __debug__:
                 try:
                     json.dumps(payload)  # 快速验证可序列化
@@ -378,7 +348,6 @@ class DataUploader:
     
     @staticmethod
     def upload_data():
-        """更健壮的上传方法"""
         try:
             payload = DataUploader.generate_payload()
             if not payload or not payload.get('user_data'):
@@ -400,7 +369,7 @@ class DataUploader:
             return False
 
 
-# ============================ 主程序 ============================
+#  主程序 
 def main():
     """主程序入口"""
     print("\n===== Seizure Detect System=====")
