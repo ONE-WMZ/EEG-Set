@@ -37,6 +37,6 @@ _**定义：**_
 - 表征学习
 
 
-## 其他相关链接
+## 参考链接
 - https://zhuanlan.zhihu.com/p/15102370282
 - https://zhuanlan.zhihu.com/p/467339680
