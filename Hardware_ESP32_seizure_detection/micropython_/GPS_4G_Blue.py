@@ -1,4 +1,3 @@
-# ============================ 导入依赖 ============================
 import sys
 import machine
 import time
@@ -16,7 +15,6 @@ RGB_NUM = 1   # RGB灯数量
 np = neopixel.NeoPixel(Pin(RGB_PIN), RGB_NUM)
 
 def rgb_flash(color=(0, 0, 255), times=2, delay_ms=200):
-    """RGB灯闪烁指定颜色若干次"""
     for _ in range(times):
         np[0] = color
         np.write()
@@ -25,13 +23,13 @@ def rgb_flash(color=(0, 0, 255), times=2, delay_ms=200):
         np.write()
         time.sleep_ms(delay_ms)
 
-# ============================ 全局变量 ============================
-device_id = "3"  # 设备编号
-nmea_x = 0.0     # GPS经度
-nmea_y = 0.0     # GPS纬度
-gps_data_valid = False  # GPS数据有效标志
-user_data = ''          # BLE接收数据
-ble_data_received = False  # BLE数据接收完成标志
+#  全局变量 
+device_id = "3"              # 设备编号
+nmea_x = 0.0                 # GPS经度
+nmea_y = 0.0                 # GPS纬度
+gps_data_valid = False       # GPS数据有效标志
+user_data = ''               # BLE接收数据
+ble_data_received = False    # BLE数据接收完成标志
 
 # GPS UART配置
 GPS_UART_PORT = 1
@@ -54,7 +52,7 @@ CHAR_UUID = bluetooth.UUID('6E400002-B5A3-F393-E0A9-E50E24DCCA9E')
 SERVER_URL = "http://httpbin.org/post"
 SERVER_PORT = 80
 
-# ============================ 4G模块 ============================
+# 4G模块 
 class LTE4GModule:
     def __init__(self):
         """初始化4G模块"""
@@ -69,7 +67,6 @@ class LTE4GModule:
         self.connected = False
         
     def send_at_command(self, command, expected_response="OK", timeout=2):
-        """发送AT命令并检查响应"""
         print(f"[4G] 发送: {command.strip()}")
         self.uart.write(command + "\r\n")
         
@@ -87,92 +84,71 @@ class LTE4GModule:
         return False
     
     def connect(self):
-        """初始化4G连接"""
         print("[4G] 初始化4G模块...")
-        
         # 1. 检查模块响应
         if not self.send_at_command("AT"):
             print("[4G] 模块无响应")
             return False
-        
         # 2. 配置APN (使用默认APN)
         if not self.send_at_command('AT+QICSGP=1,1,"","",""'):
             print("[4G] APN配置失败")
             return False
-        
         # 3. 激活移动场景
         if not self.send_at_command("AT+QIACT=1"):
             print("[4G] 激活移动场景失败")
             return False
-        
         self.connected = True
         rgb_flash((0, 255, 0))  # 绿色表示连接成功
         return True
     
     def setup_http(self):
-        """配置HTTP服务"""
         # 1. 开启HTTP服务
         if not self.send_at_command("ATSHTTPSERVE=1"):
             return False
         self.http_service_active = True
-        
         # 2. 配置URL信息
         if not self.send_at_command(f'ATSHTTPPARA="URL","{SERVER_URL}"'):
             return False
-        
         # 3. 配置端口
         if not self.send_at_command(f'ATSHTTPPARA="PORT",{SERVER_PORT}'):
             return False
-        
         return True
     
     def set_content_length(self, length):
-        """设置Content-Length请求头"""
         return self.send_at_command(f'ATSHTTPROH="Content-Length",{length}')
     
     def set_connection_header(self):
-        """设置Connection请求头"""
         return self.send_at_command('ATSHTTPROH="Connection","keep-alive"')
     
     def send_post_request(self, data):
-        """发送POST请求"""
         try:
             # 确保连接正常
             if not self.connected:
                 if not self.connect():
                     raise Exception("4G连接失败")
-            
             # 配置HTTP服务
             if not self.setup_http():
                 raise Exception("HTTP服务配置失败")
-            
             # 准备数据
             json_data = json.dumps(data)
             content_length = len(json_data)
-            
             # 设置请求头
             if not self.set_content_length(content_length):
                 raise Exception("设置Content-Length失败")
-            
             if not self.set_connection_header():
                 raise Exception("设置Connection头失败")
-            
             # 启动HTTP动作 (1表示POST)
             if not self.send_at_command("ATSHTTPACTION=1"):
                 raise Exception("启动HTTP动作失败")
-            
             # 设置请求体数据长度
             if not self.send_at_command(f"ATSHTTPDATA={content_length},10000"):
                 raise Exception("设置HTTP数据长度失败")
-            
             # 发送实际数据
             if not self.send_at_command(json_data):
                 raise Exception("发送HTTP数据失败")
-            
             # 结束请求体数据提交
             if not self.send_at_command("ATSHTTPSEND"):
                 raise Exception("提交HTTP数据失败")
-            
             return True
         except Exception as e:
             print(f"[4G] 上传失败: {e}")
@@ -183,33 +159,26 @@ class LTE4GModule:
                 self.send_at_command("ATSHTTPSERVE=0")
                 self.http_service_active = False
 
-# ============================ BLE模块 ============================
+# BLE模块 
 class BLEService:
     def __init__(self):
-        """初始化BLE服务"""
         self.ble = bluetooth.BLE()
         self.ble.active(True)
-
         if not self.ble.active():
             raise RuntimeError("无法激活BLE")
-
         self.ble.config(gap_name=BLE_DEVICE_NAME)
         self.ble.irq(self._irq_callback)
-
         self.char_handle = None
         self.connected = False
-
         self._setup_service()
         self._start_advertising()
 
     def _setup_service(self):
-        """注册BLE服务和特征"""
         try:
             services = self.ble.gatts_register_services([(
                 SERVICE_UUID,
                 ((CHAR_UUID, FLAG_READ | FLAG_WRITE),)
             )])
-            
             if services and len(services) > 0:
                 self.char_handle = services[0][0]
                 print(f"[BLE] 特征句柄: {self.char_handle}")
@@ -220,13 +189,12 @@ class BLEService:
             raise
 
     def _start_advertising(self):
-        """开始BLE广播"""
         try:
             print("[BLE] 开始广播...")
             adv_data = bytearray()
-            adv_data += b'\x02\x01\x06'  # 可连接、通用广播标志
-            adv_data += b'\x03\x02' + ustruct.pack("<H", 0x1234)  # 服务UUID
-            adv_data += b'\x0A\x09' + BLE_DEVICE_NAME.encode('utf-8')  # 设备名称
+            adv_data += b'\x02\x01\x06'                                   # 可连接、通用广播标志
+            adv_data += b'\x03\x02' + ustruct.pack("<H", 0x1234)          # 服务UUID
+            adv_data += b'\x0A\x09' + BLE_DEVICE_NAME.encode('utf-8')     # 设备名称
 
             self.ble.gap_advertise(100, adv_data)
         except OSError as e:
@@ -239,15 +207,15 @@ class BLEService:
         """BLE事件回调"""
         global user_data, ble_data_received
 
-        if event == 1:  # BLE已连接
+        if event == 1:                  # BLE已连接
             print("[BLE] 已连接")
             self.connected = True
-            rgb_flash((0, 0, 255))  # 蓝色表示BLE连接
-        elif event == 2:  # BLE断开
+            rgb_flash((0, 0, 255))      # 蓝色表示BLE连接
+        elif event == 2:                # BLE断开
             print("[BLE] 已断开")
             self.connected = False
             self._start_advertising()
-        elif event == 3:  # 有数据写入
+        elif event == 3:                # 有数据写入
             try:
                 conn_handle, value_handle = data
                 received_data = self.ble.gatts_read(value_handle)
@@ -262,14 +230,13 @@ class BLEService:
                     except UnicodeDecodeError:
                         print("[BLE] 警告：数据不是有效的ASCII字符串")
                 else:
-                    print("[BLE] ⚠️ 收到空数据")
+                    print("[BLE]  收到空数据")
             except Exception as e:
-                print(f"[BLE] ❌ 处理数据时出错: {e}")
+                print(f"[BLE]  处理数据时出错: {e}")
 
-# ============================ GPS模块 ============================
+#  GPS模块 
 class GPSReader:
     def __init__(self):
-        """初始化GPS UART接口"""
         self.uart = UART(
             GPS_UART_PORT, 
             baudrate=9600,
@@ -279,7 +246,6 @@ class GPSReader:
         print("[GPS] 初始化完成")
 
     def read_gps_data(self):
-        """读取并解析GPS数据"""
         global gps_data_valid, nmea_x, nmea_y
         
         if self.uart.any():
@@ -296,7 +262,6 @@ class GPSReader:
                 print(f"[GPS] 数据解析错误: {e}")
 
     def _parse_gll(self, sentence):
-        """解析GLL语句"""
         global gps_data_valid, nmea_x, nmea_y
         
         parts = sentence.split(',')
@@ -320,7 +285,7 @@ class GPSReader:
                 print("[GPS] 坐标转换失败")
         return False
 
-# ============================ 数据上传模块 ============================
+#  数据上传模块 
 class DataUploader:
     @staticmethod
     def generate_payload():
@@ -348,7 +313,6 @@ class DataUploader:
     
     @staticmethod
     def upload_data():
-        """上传数据到服务器"""
         global gps_data_valid, ble_data_received
         
         if not gps_data_valid or not ble_data_received:
@@ -372,7 +336,7 @@ class DataUploader:
             
         return success
 
-# ============================ 主程序 ============================
+#  主程序 
 def main():
     """主程序入口"""
     print("\n===== ESP32-S3 数据采集系统 (4G版本) =====")
