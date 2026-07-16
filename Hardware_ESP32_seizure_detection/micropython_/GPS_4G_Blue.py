@@ -9,7 +9,7 @@ from machine import UART, Pin
 import neopixel
 from ubluetooth import BLE
 
-# ============================ RGB 灯配置 ============================
+#  RGB 灯配置 
 RGB_PIN = 48  # ESP32-S3 板载 RGB 控制引脚
 RGB_NUM = 1   # RGB灯数量
 np = neopixel.NeoPixel(Pin(RGB_PIN), RGB_NUM)
